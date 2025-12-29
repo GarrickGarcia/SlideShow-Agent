@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Skill(document-skills:skill-creator)",
+      "Bash(ffmpeg:*)",
+      "Bash(where:*)",
+      "Bash(uv venv:*)",
+      "Bash(uv pip install:*)"
+    ]
+  }
+}
