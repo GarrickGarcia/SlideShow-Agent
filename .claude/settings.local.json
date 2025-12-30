@@ -17,7 +17,11 @@
       "WebFetch(domain:elevenlabs.io)",
       "Bash(.venvScriptspip.exe install anthropic)",
       "Bash(\"C:/Users/ggarcia/OneDrive - Abonmarche/Documents/GitHub/SlideShow-Agent/.venv/Scripts/python.exe\" -m pip install anthropic)",
-      "Bash(\"C:/Users/ggarcia/OneDrive - Abonmarche/Documents/GitHub/SlideShow-Agent/.venv/Scripts/python.exe\" \"C:/Users/ggarcia/OneDrive - Abonmarche/Documents/GitHub/SlideShow-Agent/create_cop_presentation.py\")"
+      "Bash(\"C:/Users/ggarcia/OneDrive - Abonmarche/Documents/GitHub/SlideShow-Agent/.venv/Scripts/python.exe\" \"C:/Users/ggarcia/OneDrive - Abonmarche/Documents/GitHub/SlideShow-Agent/create_cop_presentation.py\")",
+      "Bash(git rm:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }
