@@ -38,13 +38,23 @@ from .orchestrator import (
 from .slide_generator import (
     generate_slide,
     generate_slide_batch,
+    generate_slide_batch_with_validation,
     upload_reference_images,
+)
+
+from .image_validator import (
+    validate_slide_image,
+    validate_slide_with_retry,
+    ValidationResult,
 )
 
 from .voiceover import (
     generate_voiceover,
     generate_voiceover_batch,
+    generate_combined_voiceover,
+    combine_narrations_with_pauses,
     get_voice_info,
+    is_valid_voice,
     VOICES,
     VOICE_DESCRIPTIONS,
 )
@@ -58,7 +68,10 @@ from .transition_generator import (
 
 from .video_assembler import (
     assemble_slideshow,
+    assemble_slideshow_with_single_audio,
     create_slide_with_audio,
+    create_silent_slide_video,
+    add_audio_to_video,
     trim_transition,
     get_duration,
     get_video_info,
@@ -70,6 +83,7 @@ from .utils import (
     list_reference_images,
     get_reference_images_dir,
     check_ffmpeg,
+    get_anthropic_key,
 )
 
 __all__ = [
@@ -83,11 +97,19 @@ __all__ = [
     # Slide generation
     "generate_slide",
     "generate_slide_batch",
+    "generate_slide_batch_with_validation",
     "upload_reference_images",
+    # Image validation
+    "validate_slide_image",
+    "validate_slide_with_retry",
+    "ValidationResult",
     # Voiceover
     "generate_voiceover",
     "generate_voiceover_batch",
+    "generate_combined_voiceover",
+    "combine_narrations_with_pauses",
     "get_voice_info",
+    "is_valid_voice",
     "VOICES",
     "VOICE_DESCRIPTIONS",
     # Transitions
@@ -97,7 +119,10 @@ __all__ = [
     "TRANSITION_STYLES",
     # Video assembly
     "assemble_slideshow",
+    "assemble_slideshow_with_single_audio",
     "create_slide_with_audio",
+    "create_silent_slide_video",
+    "add_audio_to_video",
     "trim_transition",
     "get_duration",
     "get_video_info",
@@ -107,6 +132,7 @@ __all__ = [
     "list_reference_images",
     "get_reference_images_dir",
     "check_ffmpeg",
+    "get_anthropic_key",
 ]
 
 __version__ = "1.0.0"

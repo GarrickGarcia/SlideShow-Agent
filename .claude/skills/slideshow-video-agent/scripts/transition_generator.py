@@ -8,18 +8,58 @@ import requests
 from .utils import get_fal_key, api_call_with_retry
 
 
-# Available transition styles with their prompts
+# Available transition styles with their prompts - emphasize graphic morphing
 TRANSITION_STYLES = {
-    "cinematic": "Cinematic dissolve with subtle particles flowing across frame, elegant light streaks",
-    "zoom_blur": "Dynamic zoom blur, content rushes toward camera with motion blur effect",
-    "swipe": "Smooth horizontal swipe with 3D parallax depth effect",
-    "shatter": "Elements gracefully break apart into pieces that float and scatter",
-    "morph": "Organic morphing, shapes smoothly flow and transform",
-    "particles": "Content dissolves into glowing particles that swirl outward",
-    "flip": "3D card flip with realistic depth and shadow",
-    "wave": "Ripple wave effect spreading across frame",
-    "slide_left": "Content slides smoothly to the left revealing darkness",
-    "fade_blur": "Soft blur transition with gentle fade effect",
+    "cinematic": (
+        "The line-art graphics and text elements gracefully dissolve with subtle "
+        "particles flowing across frame, icons morph and transform, elegant light "
+        "streaks animate through the composition"
+    ),
+    "zoom_blur": (
+        "The icons and bullet points rush toward camera with dynamic motion blur, "
+        "line-art graphics stretch and transform as they zoom, text elements blur "
+        "and morph into abstract shapes"
+    ),
+    "swipe": (
+        "Smooth horizontal swipe where graphics slide with 3D parallax depth, "
+        "line-art icons animate and bounce slightly as they move, bullet points "
+        "stagger their exit timing"
+    ),
+    "shatter": (
+        "Line-art icons gracefully break apart into geometric pieces that float "
+        "and scatter, text elements fragment into letter shapes that drift away, "
+        "background cracks elegantly"
+    ),
+    "morph": (
+        "Organic morphing transition where line-art icons smoothly transform and "
+        "flow into abstract shapes, bullet points melt and reform, graphics animate "
+        "with fluid organic movement like ink in water"
+    ),
+    "particles": (
+        "Line-art graphics dissolve into glowing particles that swirl outward in "
+        "spiral patterns, text transforms into particle streams, icons break into "
+        "dots that dance and float away"
+    ),
+    "flip": (
+        "3D card flip with realistic depth where the entire slide rotates, "
+        "line-art graphics show parallax as the flip progresses, subtle shadow "
+        "animation enhances the 3D effect"
+    ),
+    "wave": (
+        "Ripple wave effect spreading across frame distorting the line-art icons "
+        "and text, graphics wobble and warp with the wave motion, background "
+        "undulates smoothly"
+    ),
+    "slide_left": (
+        "Content slides smoothly to the left with line-art icons bouncing slightly "
+        "as they move, bullet points stagger their departure, graphics compress "
+        "and stretch with momentum"
+    ),
+    "fade_blur": (
+        "Soft blur transition where line-art icons gently defocus and fade, "
+        "text elements blur progressively from edges, gentle particle dust "
+        "appears as graphics dissolve"
+    ),
 }
 
 # Default transition style

@@ -55,13 +55,68 @@ def get_fal_key() -> str:
     return key
 
 
+def get_anthropic_key() -> str:
+    """Get ANTHROPIC_API_KEY from environment, with helpful error if missing.
+
+    Returns:
+        The Anthropic API key string.
+
+    Raises:
+        EnvironmentError: If ANTHROPIC_API_KEY is not set.
+    """
+    load_env()
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if not key or key.startswith("your-"):
+        raise EnvironmentError(
+            "ANTHROPIC_API_KEY not found or not configured.\n"
+            "Please add your API key to .env file:\n"
+            "  ANTHROPIC_API_KEY=sk-ant-...\n"
+            "Get your key at: https://console.anthropic.com/"
+        )
+    return key
+
+
+# Known FFmpeg installation paths (WinGet, manual installs)
+FFMPEG_KNOWN_PATHS = [
+    # WinGet installation path
+    Path.home() / "AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe/ffmpeg-8.0.1-full_build/bin",
+    # Common manual installation paths
+    Path("C:/ffmpeg/bin"),
+    Path("C:/Program Files/ffmpeg/bin"),
+]
+
+
+def _find_executable(name: str) -> Optional[str]:
+    """Find executable in PATH or known locations.
+
+    Args:
+        name: Executable name (e.g., 'ffmpeg', 'ffprobe').
+
+    Returns:
+        Full path to executable or None if not found.
+    """
+    # First check PATH
+    path = shutil.which(name)
+    if path:
+        return path
+
+    # Check known installation paths
+    for known_path in FFMPEG_KNOWN_PATHS:
+        if known_path.exists():
+            exe_path = known_path / f"{name}.exe"
+            if exe_path.exists():
+                return str(exe_path)
+
+    return None
+
+
 def check_ffmpeg() -> bool:
     """Check if FFmpeg is installed and accessible.
 
     Returns:
-        True if FFmpeg is found in PATH, False otherwise.
+        True if FFmpeg is found in PATH or known locations, False otherwise.
     """
-    return shutil.which("ffmpeg") is not None
+    return _find_executable("ffmpeg") is not None
 
 
 def get_ffmpeg_path() -> str:
@@ -73,10 +128,10 @@ def get_ffmpeg_path() -> str:
     Raises:
         EnvironmentError: If FFmpeg is not installed.
     """
-    path = shutil.which("ffmpeg")
+    path = _find_executable("ffmpeg")
     if not path:
         raise EnvironmentError(
-            "FFmpeg not found in PATH.\n"
+            "FFmpeg not found in PATH or known locations.\n"
             "Install FFmpeg:\n"
             "  Windows: Download from https://github.com/BtbN/FFmpeg-Builds/releases\n"
             "           Extract and add bin folder to PATH\n"
@@ -95,10 +150,10 @@ def get_ffprobe_path() -> str:
     Raises:
         EnvironmentError: If ffprobe is not installed.
     """
-    path = shutil.which("ffprobe")
+    path = _find_executable("ffprobe")
     if not path:
         raise EnvironmentError(
-            "ffprobe not found in PATH.\n"
+            "ffprobe not found in PATH or known locations.\n"
             "ffprobe is typically installed with FFmpeg.\n"
             "Install FFmpeg to get ffprobe."
         )
@@ -244,6 +299,7 @@ def validate_prerequisites() -> dict[str, bool]:
     """
     results = {
         "fal_key": False,
+        "anthropic_key": False,
         "ffmpeg": False,
         "ffprobe": False,
         "reference_images_dir": False,
@@ -255,8 +311,14 @@ def validate_prerequisites() -> dict[str, bool]:
     except EnvironmentError:
         pass
 
+    try:
+        get_anthropic_key()
+        results["anthropic_key"] = True
+    except EnvironmentError:
+        pass
+
     results["ffmpeg"] = check_ffmpeg()
-    results["ffprobe"] = shutil.which("ffprobe") is not None
+    results["ffprobe"] = _find_executable("ffprobe") is not None
 
     try:
         get_reference_images_dir()
@@ -281,6 +343,7 @@ def print_prerequisites_status() -> bool:
     status_symbols = {True: "[OK]", False: "[MISSING]"}
 
     print(f"  {status_symbols[results['fal_key']]} FAL_KEY in .env")
+    print(f"  {status_symbols[results['anthropic_key']]} ANTHROPIC_API_KEY in .env")
     print(f"  {status_symbols[results['ffmpeg']]} FFmpeg installed")
     print(f"  {status_symbols[results['ffprobe']]} ffprobe installed")
     print(f"  {status_symbols[results['reference_images_dir']]} Reference Images folder")

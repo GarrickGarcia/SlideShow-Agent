@@ -6,7 +6,18 @@
       "Bash(ffmpeg:*)",
       "Bash(where:*)",
       "Bash(uv venv:*)",
-      "Bash(uv pip install:*)"
+      "Bash(uv pip install:*)",
+      "Bash(powershell -Command \"ffmpeg -version\")",
+      "Bash(\".venv/Scripts/python.exe\" create_cop_presentation.py)",
+      "Bash(cat:*)",
+      "WebSearch",
+      "WebFetch(domain:fal.ai)",
+      "WebFetch(domain:help.elevenlabs.io)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:elevenlabs.io)",
+      "Bash(.venvScriptspip.exe install anthropic)",
+      "Bash(\"C:/Users/ggarcia/OneDrive - Abonmarche/Documents/GitHub/SlideShow-Agent/.venv/Scripts/python.exe\" -m pip install anthropic)",
+      "Bash(\"C:/Users/ggarcia/OneDrive - Abonmarche/Documents/GitHub/SlideShow-Agent/.venv/Scripts/python.exe\" \"C:/Users/ggarcia/OneDrive - Abonmarche/Documents/GitHub/SlideShow-Agent/create_cop_presentation.py\")"
     ]
   }
 }

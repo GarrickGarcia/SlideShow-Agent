@@ -6,10 +6,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
-from .slide_generator import generate_slide_batch
-from .voiceover import generate_voiceover_batch, VOICES
+from .slide_generator import generate_slide_batch, generate_slide_batch_with_validation
+from .voiceover import generate_voiceover_batch, generate_combined_voiceover, VOICES, is_valid_voice
 from .transition_generator import generate_transitions_batch, TRANSITION_STYLES
-from .video_assembler import assemble_slideshow
+from .video_assembler import assemble_slideshow, assemble_slideshow_with_single_audio
 from .utils import (
     ensure_output_dirs,
     get_project_root,
@@ -20,11 +20,20 @@ from .utils import (
 
 @dataclass
 class Slide:
-    """Configuration for a single slide."""
+    """Configuration for a single slide.
+
+    Slides have two types of text content:
+    - bullet_points: Brief summaries shown ON the slide (3-4 items, 3-6 words each)
+    - narration: Fuller script spoken in voiceover (more detailed than slide text)
+
+    The visual_description describes the graphic style (line-art icons, not photos).
+    """
 
     title: str
-    visual_description: str
-    narration: str
+    bullet_points: list[str]  # Brief text shown on slide (3-4 items max)
+    narration: str            # Fuller script for voiceover
+    visual_description: str   # Graphic/icon description (line-art style)
+    is_title_slide: bool = False  # If True, display logo prominently
 
 
 @dataclass
@@ -40,6 +49,10 @@ class PresentationConfig:
     # Reference images for brand consistency
     reference_images: list[str] = field(default_factory=list)  # Local paths
     reference_urls: list[str] = field(default_factory=list)  # URLs
+
+    # Validation options
+    validate_slides: bool = True  # Use Claude to validate slides
+    max_validation_attempts: int = 3  # Max regeneration attempts per slide
 
 
 def create_slideshow_video(config: PresentationConfig) -> str:
@@ -71,7 +84,7 @@ def create_slideshow_video(config: PresentationConfig) -> str:
         )
 
     # Validate voice
-    if config.voice not in VOICES:
+    if not is_valid_voice(config.voice):
         print(f"Warning: Voice '{config.voice}' not recognized. Using 'George'.")
         config.voice = "George"
 
@@ -88,9 +101,14 @@ def create_slideshow_video(config: PresentationConfig) -> str:
     transitions_dir = str(dirs["transitions"])
     temp_dir = str(dirs["temp"])
 
-    # Prepare slide data
+    # Prepare slide data with new format
     slide_defs = [
-        {"title": s.title, "visual_description": s.visual_description}
+        {
+            "title": s.title,
+            "bullet_points": s.bullet_points,
+            "visual_description": s.visual_description,
+            "is_title_slide": s.is_title_slide,
+        }
         for s in config.slides
     ]
     narrations = [s.narration for s in config.slides]
@@ -101,30 +119,34 @@ def create_slideshow_video(config: PresentationConfig) -> str:
     # ===== STEP 1: Generate slide images =====
     print("=" * 60)
     print("STEP 1: Generating STATIC slide images (Nano Banana Pro)")
+    if config.validate_slides:
+        print("        With AI validation (Claude Haiku 4.5)")
     if has_refs:
         print("        Using reference images for brand consistency")
         print(f"        Local refs: {len(config.reference_images)}")
         print(f"        URL refs: {len(config.reference_urls)}")
     print("=" * 60)
 
-    slide_images = generate_slide_batch(
-        slides=slide_defs,
-        output_dir=slides_dir,
-        reference_images=config.reference_images if config.reference_images else None,
-        reference_urls=config.reference_urls if config.reference_urls else None,
-    )
+    if config.validate_slides:
+        slide_images = generate_slide_batch_with_validation(
+            slides=slide_defs,
+            output_dir=slides_dir,
+            reference_images=config.reference_images if config.reference_images else None,
+            reference_urls=config.reference_urls if config.reference_urls else None,
+            validate=True,
+            max_validation_attempts=config.max_validation_attempts,
+        )
+    else:
+        slide_images = generate_slide_batch(
+            slides=slide_defs,
+            output_dir=slides_dir,
+            reference_images=config.reference_images if config.reference_images else None,
+            reference_urls=config.reference_urls if config.reference_urls else None,
+        )
 
-    # ===== STEP 2: Generate voiceovers =====
+    # ===== STEP 2: Generate transitions =====
     print("\n" + "=" * 60)
-    print("STEP 2: Generating voiceover audio (Eleven Labs v3)")
-    print(f"        Voice: {config.voice}")
-    print("=" * 60)
-
-    audio_files = generate_voiceover_batch(narrations, audio_dir, config.voice)
-
-    # ===== STEP 3: Generate transitions =====
-    print("\n" + "=" * 60)
-    print("STEP 3: Generating ANIMATED transitions (Kling 2.6 Pro)")
+    print("STEP 2: Generating ANIMATED transitions (Kling 2.6 Pro)")
     print(f"        Style: {config.transition_style}")
     print("=" * 60)
 
@@ -134,14 +156,32 @@ def create_slideshow_video(config: PresentationConfig) -> str:
         config.transition_style,
     )
 
+    # ===== STEP 3: Generate combined voiceover =====
+    print("\n" + "=" * 60)
+    print("STEP 3: Generating COMBINED voiceover (Eleven Labs v3)")
+    print(f"        Voice: {config.voice}")
+    print("        Creating single cohesive narration with pauses")
+    print("=" * 60)
+
+    audio_file = generate_combined_voiceover(
+        narrations=narrations,
+        output_dir=audio_dir,
+        output_filename="narration_full.mp3",
+        voice=config.voice,
+        pause_marker="...",
+        pause_count=2,
+    )
+    print(f"  Saved: {audio_file}")
+
     # ===== STEP 4: Assemble =====
     print("\n" + "=" * 60)
     print("STEP 4: Assembling final video (FFmpeg)")
+    print("        Syncing slides with continuous audio track")
     print("=" * 60)
 
-    final_video = assemble_slideshow(
+    final_video = assemble_slideshow_with_single_audio(
         slide_images=slide_images,
-        audio_files=audio_files,
+        audio_file=audio_file,
         transition_videos=transition_videos,
         output_path=config.output_path,
         temp_dir=temp_dir,
@@ -167,11 +207,14 @@ def run_from_json(json_path: str) -> str:
         "reference_images": ["./Reference Images/logo.png"],
         "reference_urls": [],
         "output_path": "./output/presentation.mp4",
+        "validate_slides": true,
         "slides": [
             {
                 "title": "Slide Title",
+                "bullet_points": ["Point 1", "Point 2"],
                 "visual": "Description of visuals",
-                "narration": "Voiceover script"
+                "narration": "Voiceover script",
+                "is_title_slide": false
             }
         ]
     }
@@ -185,14 +228,21 @@ def run_from_json(json_path: str) -> str:
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    slides = [
-        Slide(
+    slides = []
+    for i, s in enumerate(data["slides"]):
+        # Support both old format (visual_description) and new format (bullet_points)
+        bullet_points = s.get("bullet_points")
+        if bullet_points is None:
+            # Backwards compatibility: use title as single bullet
+            bullet_points = [s["title"]]
+
+        slides.append(Slide(
             title=s["title"],
-            visual_description=s.get("visual", s.get("visual_description", "")),
+            bullet_points=bullet_points,
             narration=s["narration"],
-        )
-        for s in data["slides"]
-    ]
+            visual_description=s.get("visual", s.get("visual_description", "")),
+            is_title_slide=s.get("is_title_slide", i == 0),
+        ))
 
     config = PresentationConfig(
         slides=slides,
@@ -202,6 +252,8 @@ def run_from_json(json_path: str) -> str:
         transition_duration=data.get("transition_duration", 2.5),
         reference_images=data.get("reference_images", []),
         reference_urls=data.get("reference_urls", []),
+        validate_slides=data.get("validate_slides", True),
+        max_validation_attempts=data.get("max_validation_attempts", 3),
     )
 
     return create_slideshow_video(config)
@@ -214,28 +266,35 @@ def create_simple_presentation(
     voice: str = "George",
     transition_style: str = "cinematic",
     output_path: str = "./output/presentation.mp4",
+    validate_slides: bool = True,
 ) -> str:
     """Simplified interface for creating a presentation.
 
     Args:
         topic: Topic/title of the presentation.
-        slides_content: List of dicts with 'title', 'visual', and 'narration'.
+        slides_content: List of dicts with 'title', 'bullet_points', 'visual', and 'narration'.
         reference_images: List of paths to reference images.
         voice: Voice for narration.
         transition_style: Style for transitions.
         output_path: Path for output video.
+        validate_slides: Whether to validate slides with Claude.
 
     Returns:
         Path to the final video.
     """
-    slides = [
-        Slide(
+    slides = []
+    for i, s in enumerate(slides_content):
+        bullet_points = s.get("bullet_points")
+        if bullet_points is None:
+            bullet_points = [s["title"]]
+
+        slides.append(Slide(
             title=s["title"],
-            visual_description=s.get("visual", ""),
+            bullet_points=bullet_points,
             narration=s["narration"],
-        )
-        for s in slides_content
-    ]
+            visual_description=s.get("visual", ""),
+            is_title_slide=s.get("is_title_slide", i == 0),
+        ))
 
     config = PresentationConfig(
         slides=slides,
@@ -243,6 +302,7 @@ def create_simple_presentation(
         voice=voice,
         transition_style=transition_style,
         reference_images=reference_images or [],
+        validate_slides=validate_slides,
     )
 
     return create_slideshow_video(config)

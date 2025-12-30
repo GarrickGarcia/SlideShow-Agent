@@ -247,3 +247,199 @@ def get_video_info(video_path: str) -> dict:
         return {"error": result.stderr}
 
     return json.loads(result.stdout)
+
+
+def create_silent_slide_video(
+    image_path: str,
+    output_path: str,
+    duration: float,
+    frame_rate: int = 30
+) -> None:
+    """Create a silent video from a slide image with fixed duration.
+
+    Args:
+        image_path: Path to slide image.
+        output_path: Path for output video.
+        duration: Duration in seconds.
+        frame_rate: Video frame rate (default 30).
+
+    Raises:
+        RuntimeError: If FFmpeg fails.
+    """
+    ffmpeg = get_ffmpeg_path()
+
+    result = subprocess.run(
+        [
+            ffmpeg, "-y",
+            "-loop", "1",
+            "-i", image_path,
+            "-c:v", "libx264",
+            "-pix_fmt", "yuv420p",
+            "-t", str(duration),
+            "-r", str(frame_rate),
+            output_path,
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        raise RuntimeError(f"FFmpeg failed creating slide video: {result.stderr}")
+
+
+def add_audio_to_video(
+    video_path: str,
+    audio_path: str,
+    output_path: str
+) -> None:
+    """Add audio track to a video file.
+
+    Args:
+        video_path: Path to input video (silent or with existing audio).
+        audio_path: Path to audio file to add.
+        output_path: Path for output video with audio.
+
+    Raises:
+        RuntimeError: If FFmpeg fails.
+    """
+    ffmpeg = get_ffmpeg_path()
+
+    result = subprocess.run(
+        [
+            ffmpeg, "-y",
+            "-i", video_path,
+            "-i", audio_path,
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-map", "0:v:0",
+            "-map", "1:a:0",
+            "-shortest",
+            output_path,
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    if result.returncode != 0:
+        raise RuntimeError(f"FFmpeg failed adding audio: {result.stderr}")
+
+
+def assemble_slideshow_with_single_audio(
+    slide_images: list[str],
+    audio_file: str,
+    transition_videos: list[str],
+    output_path: str,
+    temp_dir: str = "./temp",
+    transition_duration: float = 2.5,
+    cleanup: bool = True
+) -> str:
+    """Assemble video with slides, transitions, and a single continuous audio track.
+
+    This creates a more cohesive presentation with consistent voiceover pacing.
+
+    Args:
+        slide_images: List of paths to slide images.
+        audio_file: Path to the single combined voiceover audio.
+        transition_videos: List of paths to transition videos.
+        output_path: Path for final output video.
+        temp_dir: Directory for temporary files.
+        transition_duration: Duration for transitions in seconds.
+        cleanup: Whether to clean up temp files after success.
+
+    Returns:
+        Path to the final video.
+
+    Raises:
+        RuntimeError: If FFmpeg fails.
+    """
+    ffmpeg = get_ffmpeg_path()
+    temp_path = Path(temp_dir)
+    temp_path.mkdir(parents=True, exist_ok=True)
+
+    # Ensure output directory exists
+    output_dir = Path(output_path).parent
+    if output_dir and str(output_dir) != ".":
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+    num_slides = len(slide_images)
+    num_transitions = len(transition_videos)
+
+    # Get total audio duration
+    audio_duration = get_duration(audio_file)
+    print(f"  Total audio duration: {audio_duration:.1f}s")
+
+    # Calculate time allocation
+    # Total transition time
+    total_transition_time = num_transitions * transition_duration
+
+    # Remaining time for slides
+    total_slide_time = audio_duration - total_transition_time
+
+    # Time per slide (evenly distributed)
+    time_per_slide = total_slide_time / num_slides
+
+    print(f"  Time per slide: {time_per_slide:.1f}s")
+    print(f"  Transition duration: {transition_duration}s x {num_transitions}")
+
+    segments = []
+
+    try:
+        # Create slide videos and transitions
+        for i, image in enumerate(slide_images):
+            # Create silent slide video
+            slide_video = str(temp_path / f"slide_{i + 1:02d}.mp4")
+            print(f"  Creating slide segment {i + 1}/{num_slides} ({time_per_slide:.1f}s)...")
+            create_silent_slide_video(image, slide_video, time_per_slide)
+            segments.append(slide_video)
+
+            # Add transition (except after last slide)
+            if i < num_transitions:
+                trimmed = str(temp_path / f"trans_{i + 1:02d}_trim.mp4")
+                print(f"  Trimming transition {i + 1}/{num_transitions}...")
+                trim_transition(transition_videos[i], trimmed, transition_duration)
+                segments.append(trimmed)
+
+        # Create concat file
+        concat_file = str(temp_path / "concat.txt")
+        with open(concat_file, "w", encoding="utf-8") as f:
+            for seg in segments:
+                seg_path = Path(seg).resolve()
+                seg_str = str(seg_path).replace("\\", "/")
+                f.write(f"file '{seg_str}'\n")
+
+        # Concatenate all video segments (silent)
+        silent_video = str(temp_path / "silent_video.mp4")
+        print("  Concatenating video segments...")
+        result = subprocess.run(
+            [
+                ffmpeg, "-y",
+                "-f", "concat",
+                "-safe", "0",
+                "-i", concat_file,
+                "-c:v", "libx264",
+                "-movflags", "+faststart",
+                silent_video,
+            ],
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(f"FFmpeg failed concatenating: {result.stderr}")
+
+        # Add audio track to final video
+        print("  Adding audio track...")
+        add_audio_to_video(silent_video, audio_file, output_path)
+
+        print(f"  Final video saved: {output_path}")
+
+        # Cleanup temp files on success
+        if cleanup:
+            cleanup_temp_dir(temp_path)
+
+        return output_path
+
+    except Exception as e:
+        print(f"Error during assembly: {e}")
+        print(f"Temp files preserved at: {temp_path}")
+        raise
