@@ -210,3 +210,6 @@ __marimo__/
 
 # Slideshow Video Agent output
 output/
+
+# Reference images (brand assets - not tracked in git)
+Reference Images/
