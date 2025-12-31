@@ -27,6 +27,7 @@ class Slide:
     - narration: Fuller script spoken in voiceover (more detailed than slide text)
 
     The visual_description describes the graphic style (line-art icons, not photos).
+    The transition_prompt describes how THIS slide animates into the NEXT slide.
     """
 
     title: str
@@ -34,6 +35,7 @@ class Slide:
     narration: str            # Fuller script for voiceover
     visual_description: str   # Graphic/icon description (line-art style)
     is_title_slide: bool = False  # If True, display logo prominently
+    transition_prompt: Optional[str] = None  # Custom animation for transition to next slide
 
 
 @dataclass
@@ -145,15 +147,24 @@ def create_slideshow_video(config: PresentationConfig) -> str:
         )
 
     # ===== STEP 2: Generate transitions =====
+    # Extract custom transition prompts from slides (all but last slide)
+    custom_prompts = [s.transition_prompt for s in config.slides[:-1]]
+    has_custom_prompts = any(p is not None for p in custom_prompts)
+
     print("\n" + "=" * 60)
-    print("STEP 2: Generating ANIMATED transitions (Kling 2.6 Pro)")
-    print(f"        Style: {config.transition_style}")
+    print("STEP 2: Generating ANIMATED transitions (Kling O1 Reference-to-Video)")
+    print("        Morphing from each slide to the next")
+    if has_custom_prompts:
+        print("        Using CUSTOM transition prompts per slide")
+    else:
+        print(f"        Style: {config.transition_style}")
     print("=" * 60)
 
     transition_videos = generate_transitions_batch(
         slide_images,
         transitions_dir,
         config.transition_style,
+        custom_prompts if has_custom_prompts else None,
     )
 
     # ===== STEP 3: Generate combined voiceover =====
